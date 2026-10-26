@@ -451,8 +451,9 @@ namespace winrt::Digi21::CrsKit::Interop::implementation
         EnsureInitialized();
         try
         {
-            // The overload that takes a WKT returns the WKT of an unknown vertical system when there is no vertical
-            // component; the overload that takes the system returns null, which this method returns as an empty string.
+            // ExtractHorizontalVertical returns the WKT of an unknown vertical system when it receives a WKT without a vertical
+            // component. For a parsed system without a vertical component, ExtractHorizontalVertical returns null for the
+            // vertical component, and GetVerticalWkt converts that null to an empty string.
             auto const vertical = GetUtilities()->ExtractHorizontalVertical(CreateCoordinateSystemFromWkt(wkt)).second;
             return vertical ? winrt::to_hstring(vertical->GetWkt()) : hstring{};
         }

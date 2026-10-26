@@ -9,7 +9,7 @@ namespace Digi21.CrsKit.Interop
     struct CrsUnit
     {
         String Name;              // crskit name of the unit, for example "metre", "US survey foot" or "degree"
-        Boolean IsAngular;        // true for a geographic system
+        Boolean IsAngular;        // true if the first axis uses an angular unit, false if it uses a linear unit
         Double MetresPerUnit;     // 0 when IsAngular is true
         Double RadiansPerUnit;    // 0 when IsAngular is false
     };
@@ -23,8 +23,8 @@ namespace Digi21.CrsKit.Interop
     // cannot read and 0 if it cannot read the axis count; GetCandidateOperations ignores a failure to create a
     // transformation after CrsKit has supplied the candidate operations to the callback that GetCandidateOperations uses;
     // after initialization, IsValidWkt, AreEquivalent and IsHorizontalComponentLocal return false, GetEpsgCode returns 0
-    // and GetWktFromGeoKeys returns an empty string. The other members throw on failure an exception that the projection
-    // of the caller's language raises.
+    // and GetWktFromGeoKeys returns an empty string. Except in those failure cases, CrsEngine members report failures as
+    // exceptions in the caller's language.
     [default_interface]
     runtimeclass CrsEngine
     {
