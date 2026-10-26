@@ -17,7 +17,7 @@ namespace winrt::Digi21::CrsKit::Interop::implementation
         static hstring GetWkt(int32_t code);
         static winrt::Digi21::CrsKit::Interop::CrsDetails GetDetails(int32_t code);
         static hstring GetWktWithAxisOrder(int32_t code, winrt::Digi21::CrsKit::Interop::AxisOrder order);
-        static hstring GetStandardAxisLabel(int32_t code);
+        static hstring GetCatalogueAxisNamesLabel(int32_t code);
         static hstring GetCompoundWkt(int32_t horizontalCode, int32_t verticalCode);
         static hstring GetCrsNameFromWkt(hstring const& wkt);
         static hstring DescribeAxes(hstring const& wkt);

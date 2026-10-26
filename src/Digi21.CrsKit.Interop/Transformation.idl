@@ -1,6 +1,6 @@
 namespace Digi21.CrsKit.Interop
 {
-    // A ready-to-use coordinate transformation between two CRS. Coordinates are
+    // A coordinate transformation between two coordinate reference systems (CRS). Coordinates are
     // flat arrays of ordinates. Geographic CRS use {latitude, longitude[, height]}
     // ordinate order (CrsKit convention); projected CRS use {x, y[, z]}.
     runtimeclass Transformation
@@ -14,8 +14,8 @@ namespace Digi21.CrsKit.Interop
         // Transform a single point (SourceDimension ordinates in, TargetDimension out).
         Double[] Transform(Double[] point);
 
-        // Transform N points at once from a flat, row-major buffer
-        // (SourceDimension ordinates per point). Returns the transformed flat buffer.
+        // Transforms points stored consecutively in a one-dimensional array, with SourceDimension ordinates per point.
+        // Returns a one-dimensional array with TargetDimension ordinates per transformed point.
         Double[] TransformPoints(Double[] flatPoints);
     }
 }

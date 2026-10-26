@@ -38,29 +38,29 @@ namespace
     }
 
     // Marshal one native candidate operation into its projected read-only view.
-    winrt::Digi21::CrsKit::Interop::CoordinateOperationInfo MakeOperationInfo(CoordinateOperation const& op)
+    winrt::Digi21::CrsKit::Interop::CoordinateOperationInfo MakeOperationInfo(CoordinateOperation const& candidateOperation)
     {
         winrt::Windows::Foundation::IReference<double> accuracy{ nullptr };
-        if (op.Accuracy.has_value())
-            accuracy = winrt::box_value(op.Accuracy.value())
+        if (candidateOperation.Accuracy.has_value())
+            accuracy = winrt::box_value(candidateOperation.Accuracy.value())
                            .as<winrt::Windows::Foundation::IReference<double>>();
 
         std::string gridFiles;
-        for (auto const& file : op.GridFiles)
+        for (auto const& file : candidateOperation.GridFiles)
         {
             if (!gridFiles.empty()) gridFiles += ", ";
             gridFiles += file;
         }
 
         return winrt::make<winrt::Digi21::CrsKit::Interop::implementation::CoordinateOperationInfo>(
-            op.Code,
-            winrt::to_hstring(op.Name),
-            winrt::to_hstring(op.Type),
+            candidateOperation.Code,
+            winrt::to_hstring(candidateOperation.Name),
+            winrt::to_hstring(candidateOperation.Type),
             accuracy,
-            winrt::to_hstring(op.Scope.value_or("")),
-            winrt::to_hstring(op.Remarks.value_or("")),
-            op.MethodCode,
-            winrt::to_hstring(op.AreaOfUse),
+            winrt::to_hstring(candidateOperation.Scope.value_or("")),
+            winrt::to_hstring(candidateOperation.Remarks.value_or("")),
+            candidateOperation.MethodCode,
+            winrt::to_hstring(candidateOperation.AreaOfUse),
             winrt::to_hstring(gridFiles));
     }
 
@@ -114,9 +114,9 @@ namespace winrt::Digi21::CrsKit::Interop::implementation
         EnsureInitialized();
         try
         {
-            auto const map = GetCoordinateSystemAuthorityFactory()->EnumerateCoordinateSystems(winrt::to_string(kind));
+            auto const coordinateSystemNamesByCode = GetCoordinateSystemAuthorityFactory()->EnumerateCoordinateSystems(winrt::to_string(kind));
             auto result = winrt::single_threaded_vector<winrt::Digi21::CrsKit::Interop::CrsInfo>();
-            for (auto const& [code, name] : map)
+            for (auto const& [code, name] : coordinateSystemNamesByCode)
                 result.Append(winrt::make<implementation::CrsInfo>(code, winrt::to_hstring(name), kind));
             return result;
         }
@@ -161,7 +161,7 @@ namespace winrt::Digi21::CrsKit::Interop::implementation
 
             hstring const name = getStringOrEmpty([&] { return MakeCoordinateSystem(code)->GetName(); });
             hstring const kind = getStringOrEmpty([&] { return coordinateSystemAuthorityFactory->GetKindOfCoordinateSystem(code); });
-            hstring const area = getStringOrEmpty([&] { return coordinateSystemAuthorityFactory->GetDescriptionAreaApplicationCrs(code); });
+            hstring const areaOfUse = getStringOrEmpty([&] { return coordinateSystemAuthorityFactory->GetDescriptionAreaApplicationCrs(code); });
 
             int32_t axisCount{};
             try
@@ -171,19 +171,19 @@ namespace winrt::Digi21::CrsKit::Interop::implementation
             }
             catch (...) {}
 
-            hstring datumName, datumOrigin, meridian, ellipsoid;
+            hstring datumName, datumOrigin, primeMeridianName, ellipsoidName;
             try
             {
                 int const datumCode = coordinateSystemAuthorityFactory->GetCodeOfDatumAssociatedWithCrs(code);
                 datumName = getStringOrEmpty([&] { return coordinateSystemAuthorityFactory->GetNameOfDatum(datumCode); });
                 datumOrigin = getStringOrEmpty([&] { return coordinateSystemAuthorityFactory->GetOriginDescriptionOfDatum(datumCode); });
-                ellipsoid = getStringOrEmpty([&] { return coordinateSystemAuthorityFactory->GetNameOfEllipsoid(coordinateSystemAuthorityFactory->GetCodeOfEllipsoidAssociatedWithDatum(datumCode)); });
+                ellipsoidName = getStringOrEmpty([&] { return coordinateSystemAuthorityFactory->GetNameOfEllipsoid(coordinateSystemAuthorityFactory->GetCodeOfEllipsoidAssociatedWithDatum(datumCode)); });
             }
             catch (...) {}
-            meridian = getStringOrEmpty([&] { return coordinateSystemAuthorityFactory->GetNameOfPrimeMeridian(coordinateSystemAuthorityFactory->GetCodeOfPrimeMeridianAssociatedWithCrs(code)); });
+            primeMeridianName = getStringOrEmpty([&] { return coordinateSystemAuthorityFactory->GetNameOfPrimeMeridian(coordinateSystemAuthorityFactory->GetCodeOfPrimeMeridianAssociatedWithCrs(code)); });
 
             return winrt::make<implementation::CrsDetails>(
-                code, name, kind, axisCount, area, datumName, datumOrigin, meridian, ellipsoid);
+                code, name, kind, axisCount, areaOfUse, datumName, datumOrigin, primeMeridianName, ellipsoidName);
         }
         catch (winrt::hresult_error const&) { throw; }
         catch (std::exception const& e) { ThrowWinrtError(e); }
@@ -197,18 +197,18 @@ namespace winrt::Digi21::CrsKit::Interop::implementation
         catch (std::exception const& e) { ThrowWinrtError(e); }
     }
 
-    hstring CrsEngine::GetStandardAxisLabel(int32_t code)
+    hstring CrsEngine::GetCatalogueAxisNamesLabel(int32_t code)
     {
         EnsureInitialized();
         try
         {
             auto const coordinateSystem = MakeCoordinateSystem(code);
-            // The horizontal order is defined by the first two axes; use their real
-            // catalogue names (EPSG abbreviations) rather than a hard-coded mapping.
+            // GetCatalogueAxisNamesLabel joins with "-" the non-empty catalogue names (EPSG abbreviations) it can read from up to
+            // the first two axes.
             int const dimension = coordinateSystem->GetDimension();
-            int const count = dimension < 2 ? dimension : 2;
+            int const inspectedAxisCount = dimension < 2 ? dimension : 2;
             std::string label;
-            for (int axisIndex = 0; axisIndex < count; ++axisIndex)
+            for (int axisIndex = 0; axisIndex < inspectedAxisCount; ++axisIndex)
             {
                 std::string name;
                 try { name = coordinateSystem->GetAxis(axisIndex).GetName(); } catch (...) {}
@@ -259,23 +259,23 @@ namespace winrt::Digi21::CrsKit::Interop::implementation
             if (!coordinateSystem)
                 throw winrt::hresult_error(E_FAIL, L"The WKT is not a valid coordinate reference system.");
 
-            auto unitName = [](AnyUnit const& u) -> std::string
+            auto getUnitName = [](AnyUnit const& unit) -> std::string
             {
-                return std::visit([](auto const& x) { return x.GetName(); }, u);
+                return std::visit([](auto const& concreteUnit) { return concreteUnit.GetName(); }, unit);
             };
 
             std::string result;
             int const dimension = coordinateSystem->GetDimension();
             for (int axisIndex = 0; axisIndex < dimension; ++axisIndex)
             {
-                std::string axisName, unit;
+                std::string axisName, unitName;
                 try { axisName = coordinateSystem->GetAxis(axisIndex).GetName(); } catch (...) {}
-                try { unit = unitName(coordinateSystem->GetUnits(axisIndex)); } catch (...) {}
+                try { unitName = getUnitName(coordinateSystem->GetUnits(axisIndex)); } catch (...) {}
                 if (axisName.empty()) axisName = std::format("Axis {}", axisIndex + 1);
 
                 if (!result.empty()) result += ", ";
                 result += axisName;
-                if (!unit.empty()) result += std::format(" ({})", unit);
+                if (!unitName.empty()) result += std::format(" ({})", unitName);
             }
             return winrt::to_hstring(result);
         }
@@ -290,8 +290,8 @@ namespace winrt::Digi21::CrsKit::Interop::implementation
         {
             auto const source = MakeCoordinateSystem(sourceCode);
             auto const target = MakeCoordinateSystem(targetCode);
-            auto const ct = GetCoordinateTransformationFactory()->CreateFromCoordinateSystems(source, target);
-            return winrt::make<implementation::Transformation>(ct);
+            auto const coordinateTransformation = GetCoordinateTransformationFactory()->CreateFromCoordinateSystems(source, target);
+            return winrt::make<implementation::Transformation>(coordinateTransformation);
         }
         catch (winrt::hresult_error const&) { throw; }
         catch (std::exception const& e) { ThrowWinrtError(e); }
@@ -305,8 +305,8 @@ namespace winrt::Digi21::CrsKit::Interop::implementation
         {
             auto const source = GetCoordinateSystemFactory()->CreateFromWkt(winrt::to_string(sourceWkt));
             auto const target = GetCoordinateSystemFactory()->CreateFromWkt(winrt::to_string(targetWkt));
-            auto const ct = GetCoordinateTransformationFactory()->CreateFromCoordinateSystems(source, target);
-            return winrt::make<implementation::Transformation>(ct);
+            auto const coordinateTransformation = GetCoordinateTransformationFactory()->CreateFromCoordinateSystems(source, target);
+            return winrt::make<implementation::Transformation>(coordinateTransformation);
         }
         catch (winrt::hresult_error const&) { throw; }
         catch (std::exception const& e) { ThrowWinrtError(e); }
@@ -328,11 +328,11 @@ namespace winrt::Digi21::CrsKit::Interop::implementation
             CoordinateTransformationOptions options{};
             options.selectOperation =
                 [&candidateOperations, &hasReceivedCandidateOperations](std::string const&, std::string const&,
-                                         std::vector<CoordinateOperation> const& ops) -> int
+                                         std::vector<CoordinateOperation> const& availableCandidateOperations) -> int
                 {
-                    candidateOperations = ops;
+                    candidateOperations = availableCandidateOperations;
                     hasReceivedCandidateOperations = true;
-                    return ops.empty() ? 0 : ops.front().Code; // CrsKit builds the discarded transformation with the first operation
+                    return availableCandidateOperations.empty() ? 0 : availableCandidateOperations.front().Code; // CrsKit builds the discarded transformation with the first operation
                 };
 
             try
@@ -347,8 +347,8 @@ namespace winrt::Digi21::CrsKit::Interop::implementation
             }
 
             auto result = winrt::single_threaded_vector<winrt::Digi21::CrsKit::Interop::CoordinateOperationInfo>();
-            for (auto const& op : candidateOperations)
-                result.Append(MakeOperationInfo(op));
+            for (auto const& candidateOperation : candidateOperations)
+                result.Append(MakeOperationInfo(candidateOperation));
             return result.GetView();
         }
         catch (winrt::hresult_error const&) { throw; }
@@ -369,8 +369,8 @@ namespace winrt::Digi21::CrsKit::Interop::implementation
                 [operationCode](std::string const&, std::string const&,
                                 std::vector<CoordinateOperation> const&) -> int { return operationCode; };
 
-            auto const ct = GetCoordinateTransformationFactory()->CreateFromCoordinateSystems(source, target, options);
-            return winrt::make<implementation::Transformation>(ct);
+            auto const coordinateTransformation = GetCoordinateTransformationFactory()->CreateFromCoordinateSystems(source, target, options);
+            return winrt::make<implementation::Transformation>(coordinateTransformation);
         }
         catch (winrt::hresult_error const&) { throw; }
         catch (std::exception const& e) { ThrowWinrtError(e); }

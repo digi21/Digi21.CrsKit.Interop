@@ -42,16 +42,15 @@
   </ItemGroup>
 
   <!-- The package carries the component and the crskit runtime DLLs; the C# projection activates the component by
-       loading Digi21.CrsKit.Interop.dll. The items are added from a target because the component's output folder does
-       not exist until the project reference builds it, and an evaluation-time Include would expand to nothing in a
-       clean tree. -->
+       loading Digi21.CrsKit.Interop.dll. The target adds the paths of the three DLLs and checks that the files exist
+       before packing, because the project reference builds them after this project is evaluated. -->
   <Target Name="AddNativeComponentToPackage">
     <ItemGroup>
-      <NativeComponentFile Include="$(NativeComponentOutputDirectory)Digi21.CrsKit.Interop.dll;$(NativeComponentOutputDirectory)crskit.dll;$(NativeComponentOutputDirectory)sqlite3.dll" />
+      <NativeRuntimeFiles Include="$(NativeComponentOutputDirectory)Digi21.CrsKit.Interop.dll;$(NativeComponentOutputDirectory)crskit.dll;$(NativeComponentOutputDirectory)sqlite3.dll" />
     </ItemGroup>
-    <Error Condition="!Exists('%(NativeComponentFile.FullPath)')" Text="%(NativeComponentFile.FullPath) was not found. Build the solution in Release x64 before packing." />
+    <Error Condition="!Exists('%(NativeRuntimeFiles.FullPath)')" Text="%(NativeRuntimeFiles.FullPath) was not found. Build the solution in Release x64 before packing." />
     <ItemGroup>
-      <TfmSpecificPackageFile Include="@(NativeComponentFile)" PackagePath="runtimes\win-x64\native" />
+      <TfmSpecificPackageFile Include="@(NativeRuntimeFiles)" PackagePath="runtimes\win-x64\native" />
     </ItemGroup>
   </Target>
 

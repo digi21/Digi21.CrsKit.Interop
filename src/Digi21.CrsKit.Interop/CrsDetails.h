@@ -35,4 +35,4 @@ namespace winrt::Digi21::CrsKit::Interop::implementation
 
 // No factory_implementation: CrsDetails has no activation constructor and no static
 // members, so CppWinRT generates no activation factory. It is created internally
-// via winrt::make<implementation::CrsDetails>() and only returned across the ABI.
+// via winrt::make<implementation::CrsDetails>() and only returned across the application binary interface (ABI).

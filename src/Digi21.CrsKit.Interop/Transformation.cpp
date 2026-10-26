@@ -18,14 +18,14 @@ namespace winrt::Digi21::CrsKit::Interop::implementation
 
     hstring Transformation::SourceName()
     {
-        auto const cs = _coordinateTransformation->GetSourceCS();
-        return cs ? winrt::to_hstring(cs->GetName()) : hstring{};
+        auto const sourceCoordinateSystem = _coordinateTransformation->GetSourceCS();
+        return sourceCoordinateSystem ? winrt::to_hstring(sourceCoordinateSystem->GetName()) : hstring{};
     }
 
     hstring Transformation::TargetName()
     {
-        auto const cs = _coordinateTransformation->GetTargetCS();
-        return cs ? winrt::to_hstring(cs->GetName()) : hstring{};
+        auto const targetCoordinateSystem = _coordinateTransformation->GetTargetCS();
+        return targetCoordinateSystem ? winrt::to_hstring(targetCoordinateSystem->GetName()) : hstring{};
     }
 
     int32_t Transformation::SourceDimension() { return _mathTransform->GetSourceDimension(); }
@@ -34,15 +34,15 @@ namespace winrt::Digi21::CrsKit::Interop::implementation
 
     com_array<double> Transformation::Transform(array_view<double const> point)
     {
-        std::vector<double> const in{ point.begin(), point.end() };
-        auto const out = _mathTransform->Transform(in);
-        return com_array<double>{ out.begin(), out.end() };
+        std::vector<double> const sourcePoint{ point.begin(), point.end() };
+        auto const transformedPoint = _mathTransform->Transform(sourcePoint);
+        return com_array<double>{ transformedPoint.begin(), transformedPoint.end() };
     }
 
     com_array<double> Transformation::TransformPoints(array_view<double const> flatPoints)
     {
         std::span<double const> const source{ flatPoints.data(), flatPoints.size() };
-        auto const out = _mathTransform->TransformPoints(source);
-        return com_array<double>{ out.begin(), out.end() };
+        auto const transformedPoints = _mathTransform->TransformPoints(source);
+        return com_array<double>{ transformedPoints.begin(), transformedPoints.end() };
     }
 }

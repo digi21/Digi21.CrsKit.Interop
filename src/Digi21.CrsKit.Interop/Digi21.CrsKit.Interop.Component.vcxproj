@@ -17,8 +17,8 @@
     <WindowsTargetPlatformVersion Condition=" '$(WindowsTargetPlatformVersion)' == '' ">10.0.26100.0</WindowsTargetPlatformVersion>
     <WindowsTargetPlatformMinVersion>10.0.17763.0</WindowsTargetPlatformMinVersion>
     <CppWinRTOptimized>true</CppWinRTOptimized>
-    <!-- vcpkg (manifest mode): consume the 'crskit' package built by the overlay
-         port referenced in vcpkg-configuration.json. x64 only (x64-windows triplet). -->
+    <!-- In manifest mode, vcpkg installs crskit from the registry declared in vcpkg-configuration.json, using the
+         x64-windows triplet. -->
     <VcpkgRoot Condition="'$(VcpkgRoot)'==''">$(VCPKG_ROOT)</VcpkgRoot>
     <VcpkgEnableManifest>true</VcpkgEnableManifest>
     <VcpkgManifestInstall>true</VcpkgManifestInstall>
@@ -58,9 +58,8 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
-  <!-- Deterministic output location (independent of $(SolutionDir)), so the projection and the
-       packages can find Digi21.CrsKit.Interop.dll and the vcpkg app-local runtime DLLs
-       (crskit(D).dll, sqlite3.dll). -->
+  <!-- Output location independent of $(SolutionDir): the packaging target of the projection project reads
+       Digi21.CrsKit.Interop.dll, crskit.dll and sqlite3.dll from this directory. -->
   <PropertyGroup>
     <!-- C#/WinRT activates the component by loading the DLL named after its WinRT namespace. -->
     <TargetName>Digi21.CrsKit.Interop</TargetName>

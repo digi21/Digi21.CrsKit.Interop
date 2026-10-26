@@ -9,13 +9,13 @@ namespace Digi21.CrsKit.Interop
     };
 
     // Read-only descriptive metadata of one CRS, for the picker's detail pane.
-    // Created internally (winrt::make) and only returned across the ABI.
+    // Created internally (winrt::make) and returned by CrsEngine.GetDetails.
     runtimeclass CrsDetails
     {
         Int32  Code{ get; };
         String Name{ get; };
         String Kind{ get; };        // "projected", "geographic 2D", "vertical", ...
-        Int32  AxisCount{ get; };   // number of axes of the coordinate reference system: 1, 2 or 3
+        Int32  AxisCount{ get; };   // number of axes of the coordinate reference system; 0 if the axis count cannot be read
         String AreaOfUse{ get; };
         String DatumName{ get; };
         String DatumOrigin{ get; };

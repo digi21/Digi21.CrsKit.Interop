@@ -2,7 +2,7 @@ namespace Digi21.CrsKit.Interop
 {
     // One candidate EPSG coordinate operation between two systems, for the
     // "which transformation to use" picker. Created internally (winrt::make) and
-    // only returned across the ABI. See CrsEngine.GetCandidateOperations.
+    // returned by CrsEngine.GetCandidateOperations.
     runtimeclass CoordinateOperationInfo
     {
         Int32  Code{ get; };                             // EPSG operation code
