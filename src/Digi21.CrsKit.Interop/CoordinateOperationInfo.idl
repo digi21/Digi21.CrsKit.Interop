@@ -1,0 +1,18 @@
+namespace Digi21.CrsKit.Interop
+{
+    // One candidate EPSG coordinate operation between two systems, for the
+    // "which transformation to use" picker. Created internally (winrt::make) and
+    // only returned across the ABI. See CrsEngine.GetCandidateOperations.
+    runtimeclass CoordinateOperationInfo
+    {
+        Int32  Code{ get; };                             // EPSG operation code
+        String Name{ get; };                             // operation name
+        String Type{ get; };                             // operation type (transformation, concatenated, ...)
+        Windows.Foundation.IReference<Double> AccuracyMetres{ get; };  // stated accuracy in metres, null if unknown
+        String Scope{ get; };                            // usage scope, "" if absent
+        String Remarks{ get; };                          // catalogue remarks, "" if absent
+        Int32  MethodCode{ get; };                       // EPSG method (algorithm) code
+        String AreaOfUse{ get; };                        // EPSG area of use (geographic extent), "" if none
+        String GridFiles{ get; };                        // grid file(s) the operation needs, comma-separated, "" if none
+    }
+}

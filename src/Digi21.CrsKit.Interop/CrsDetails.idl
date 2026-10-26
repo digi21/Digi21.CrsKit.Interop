@@ -1,0 +1,25 @@
+namespace Digi21.CrsKit.Interop
+{
+    // Axis order used when generating the Well-Known Text (WKT) definition of a horizontal coordinate reference system (CRS).
+    enum AxisOrder
+    {
+        Default,     // as defined by the EPSG catalogue
+        EastNorth,   // longitude/easting first
+        NorthEast    // latitude/northing first
+    };
+
+    // Read-only descriptive metadata of one CRS, for the picker's detail pane.
+    // Created internally (winrt::make) and only returned across the ABI.
+    runtimeclass CrsDetails
+    {
+        Int32  Code{ get; };
+        String Name{ get; };
+        String Kind{ get; };        // "projected", "geographic 2D", "vertical", ...
+        Int32  AxisCount{ get; };   // number of axes of the coordinate reference system: 1, 2 or 3
+        String AreaOfUse{ get; };
+        String DatumName{ get; };
+        String DatumOrigin{ get; };
+        String PrimeMeridianName{ get; };
+        String EllipsoidName{ get; };
+    }
+}

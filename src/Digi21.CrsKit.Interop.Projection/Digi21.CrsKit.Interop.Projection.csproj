@@ -1,0 +1,58 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Platforms>x64</Platforms>
+    <PublishTrimmed>false</PublishTrimmed>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <!-- Generate the C# projection for the Digi21.CrsKit.Interop component's root namespace. -->
+    <CsWinRTIncludes>Digi21.CrsKit.Interop</CsWinRTIncludes>
+    <CsWinRTGeneratedFilesDir>$(OutDir)</CsWinRTGeneratedFilesDir>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <PackageId>Digi21.CrsKit.Interop</PackageId>
+    <Version>1.0.0-preview.1</Version>
+    <Authors>Digi21</Authors>
+    <Description>Windows Runtime component and C# projection over crskit: EPSG catalogue, Well-Known Text (WKT) definitions and coordinate transformations. x64 only.</Description>
+    <PackageTags>crs;epsg;wkt;coordinates;projection;winrt</PackageTags>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryUrl>https://github.com/digi21/Digi21.CrsKit.Interop</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageProjectUrl>https://github.com/digi21/Digi21.CrsKit.Interop</PackageProjectUrl>
+    <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);AddNativeComponentToPackage</TargetsForTfmSpecificContentInPackage>
+    <!-- Output folder of the C++/WinRT component, which the project reference builds before this project. -->
+    <NativeComponentOutputDirectory>$(MSBuildThisFileDirectory)..\Digi21.CrsKit.Interop\bin\$(Platform)\$(Configuration)\</NativeComponentOutputDirectory>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Windows.CsWinRT" Version="2.2.0" />
+    <ProjectReference Include="..\Digi21.CrsKit.Interop\Digi21.CrsKit.Interop.Component.vcxproj" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+    <None Include="..\..\THIRD-PARTY-NOTICES.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <!-- The package carries the component and the crskit runtime DLLs; the C# projection activates the component by
+       loading Digi21.CrsKit.Interop.dll. The items are added from a target because the component's output folder does
+       not exist until the project reference builds it, and an evaluation-time Include would expand to nothing in a
+       clean tree. -->
+  <Target Name="AddNativeComponentToPackage">
+    <ItemGroup>
+      <NativeComponentFile Include="$(NativeComponentOutputDirectory)Digi21.CrsKit.Interop.dll;$(NativeComponentOutputDirectory)crskit.dll;$(NativeComponentOutputDirectory)sqlite3.dll" />
+    </ItemGroup>
+    <Error Condition="!Exists('%(NativeComponentFile.FullPath)')" Text="%(NativeComponentFile.FullPath) was not found. Build the solution in Release x64 before packing." />
+    <ItemGroup>
+      <TfmSpecificPackageFile Include="@(NativeComponentFile)" PackagePath="runtimes\win-x64\native" />
+    </ItemGroup>
+  </Target>
+
+</Project>

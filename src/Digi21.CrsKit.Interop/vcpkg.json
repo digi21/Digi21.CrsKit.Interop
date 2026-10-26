@@ -1,0 +1,10 @@
+{
+  "name": "digi21-crskit-interop",
+  "version": "0.0.0",
+  "dependencies": [
+    {
+      "name": "crskit",
+      "version>=": "0.6.0"
+    }
+  ]
+}

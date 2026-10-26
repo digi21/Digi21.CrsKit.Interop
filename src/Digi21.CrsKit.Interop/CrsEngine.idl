@@ -1,0 +1,62 @@
+import "CrsInfo.idl";
+import "CrsDetails.idl";
+import "CoordinateOperationInfo.idl";
+import "Transformation.idl";
+
+namespace Digi21.CrsKit.Interop
+{
+    // Process-wide entry point to the CrsKit library. Call Initialize once, with the path of the EPSG SQLite database and
+    // the directory of the grid files, before requesting coordinate reference system (CRS) definitions or creating transformations; IsInitialized and
+    // GetEpsgVersion can be queried before initialization. GetEpsgVersion returns an empty string if the version lookup
+    // fails; GetStandardAxisLabel requires initialization and returns an empty string if no axis name can be obtained.
+    // GetDetails returns empty values for the metadata it cannot read, and GetCandidateOperations ignores a failure to
+    // create a transformation after CrsKit has passed it the candidate operations. The other members throw a projected
+    // exception on failure.
+    [default_interface]
+    runtimeclass CrsEngine
+    {
+        static void Initialize(String epsgDatabaseFilePath, String gridFilesDirectoryPath);
+        static Boolean IsInitialized{ get; };
+
+        // EPSG Geodetic Parameter Dataset version of the active database (e.g. "12.057"); "" if unknown.
+        static String GetEpsgVersion();
+
+        // Every CRS of the given kind in the EPSG catalogue, as {code, name, kind}.
+        // Valid kinds: "projected", "geographic 2D", "geographic 3D", "compound",
+        // "vertical", "geocentric".
+        static Windows.Foundation.Collections.IVector<CrsInfo> EnumerateCoordinateSystems(String kind);
+
+        static String GetName(Int32 code);
+        static String GetAreaOfUse(Int32 code);
+        static String GetWkt(Int32 code);
+
+        // CRS name, kind, axis count, area of use, datum name and origin, prime meridian name and ellipsoid name.
+        static CrsDetails GetDetails(Int32 code);
+        // WKT of a CRS with a chosen axis order (Default keeps the EPSG definition).
+        static String GetWktWithAxisOrder(Int32 code, AxisOrder order);
+        // Joins with "-" the non-empty names of the first two axes of a CRS, in catalogue order, e.g. "Lat-Long" or "E-N";
+        // for a one-dimensional CRS, returns the name of its axis. Omits an axis whose name cannot be read. Returns an empty
+        // string if neither axis has a name or if reading the dimension of the CRS fails.
+        static String GetStandardAxisLabel(Int32 code);
+        // WKT of the compound CRS formed by a horizontal and a vertical CRS.
+        static String GetCompoundWkt(Int32 horizontalCode, Int32 verticalCode);
+        // Validate a raw WKT (manual entry / .prj import) and return its CRS name; throws if invalid.
+        static String GetCrsNameFromWkt(String wkt);
+        // Human-readable axes and their units for a CRS given by WKT, e.g.
+        // "Easting (metre), Northing (metre)" or "Latitude (degree), Longitude (degree)".
+        static String DescribeAxes(String wkt);
+
+        static Transformation CreateTransformation(Int32 sourceCode, Int32 targetCode);
+        static Transformation CreateTransformationFromWkt(String sourceWkt, String targetWkt);
+
+        // Returns the candidate EPSG operations that CrsKit passes to its selectOperation callback, which CrsKit invokes when
+        // more than one operation applies, in the order CrsKit passes them. Returns an empty view if CrsKit builds the
+        // transformation without invoking the callback.
+        static Windows.Foundation.Collections.IVectorView<CoordinateOperationInfo> GetCandidateOperations(
+            String sourceWkt, String targetWkt);
+        // Build the transformation using a specific EPSG operation code chosen from
+        // GetCandidateOperations (e.g. the user's pick in the operation-selection dialog).
+        static Transformation CreateTransformationFromWktWithOperation(
+            String sourceWkt, String targetWkt, Int32 operationCode);
+    }
+}

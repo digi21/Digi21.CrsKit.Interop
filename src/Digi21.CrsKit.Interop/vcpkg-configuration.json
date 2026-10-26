@@ -1,0 +1,16 @@
+{
+  "$comment": "crskit is consumed from its public vcpkg registry (github.com/digi21/crskit). Bump the crskit baseline to pull a newer released version.",
+  "default-registry": {
+    "kind": "git",
+    "repository": "https://github.com/microsoft/vcpkg",
+    "baseline": "fc3be1ebea7eaeb3071fe716ac65713af1f3a146"
+  },
+  "registries": [
+    {
+      "kind": "git",
+      "repository": "https://github.com/digi21/crskit",
+      "baseline": "eb1916e3f5bf8d6059c677e859a132f2af459a3d",
+      "packages": ["crskit"]
+    }
+  ]
+}

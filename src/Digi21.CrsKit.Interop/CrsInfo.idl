@@ -1,0 +1,10 @@
+namespace Digi21.CrsKit.Interop
+{
+    // EPSG coordinate reference system code, name and kind, returned by CrsEngine.EnumerateCoordinateSystems.
+    runtimeclass CrsInfo
+    {
+        Int32  Code{ get; };
+        String Name{ get; };
+        String Kind{ get; };   // "projected", "geographic 2D", "geographic 3D", "compound", "vertical", ...
+    }
+}
