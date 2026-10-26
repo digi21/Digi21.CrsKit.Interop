@@ -18,7 +18,7 @@
     <WindowsTargetPlatformMinVersion>10.0.17763.0</WindowsTargetPlatformMinVersion>
     <CppWinRTOptimized>true</CppWinRTOptimized>
     <!-- In manifest mode, vcpkg installs crskit from the registry declared in vcpkg-configuration.json, using the
-         x64-windows triplet. -->
+         x64-windows triplet, the vcpkg target configuration for 64-bit Windows. -->
     <VcpkgRoot Condition="'$(VcpkgRoot)'==''">$(VCPKG_ROOT)</VcpkgRoot>
     <VcpkgEnableManifest>true</VcpkgEnableManifest>
     <VcpkgManifestInstall>true</VcpkgManifestInstall>

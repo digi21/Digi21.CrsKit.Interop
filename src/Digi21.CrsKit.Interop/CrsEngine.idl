@@ -5,13 +5,26 @@ import "Transformation.idl";
 
 namespace Digi21.CrsKit.Interop
 {
-    // Process-wide entry point to the CrsKit library. Call Initialize once, with the path of the EPSG SQLite database and
-    // the directory of the grid files, before requesting coordinate reference system (CRS) definitions or creating transformations; IsInitialized and
-    // GetEpsgVersion can be queried before initialization. GetEpsgVersion returns an empty string if the version lookup
-    // fails; GetCatalogueAxisNamesLabel requires initialization and returns an empty string if no axis name can be obtained.
-    // GetDetails returns an empty string for each text field it cannot read and 0 if it cannot read the axis count, and GetCandidateOperations ignores a failure to
-    // create a transformation after CrsKit has passed it the candidate operations. The other members throw a projected
-    // exception on failure.
+    // Unit of the first axis of a coordinate reference system, returned by CrsEngine.GetFirstAxisUnit.
+    struct CrsUnit
+    {
+        String Name;              // crskit name of the unit, for example "metre", "US survey foot" or "degree"
+        Boolean IsAngular;        // true for a geographic system
+        Double MetresPerUnit;     // 0 when IsAngular is true
+        Double RadiansPerUnit;    // 0 when IsAngular is false
+    };
+
+    // Process-wide entry point to the CrsKit library. Call Initialize once, with the path of the SQLite database of the
+    // EPSG (European Petroleum Survey Group) Geodetic Parameter Dataset and the directory of the grid files, before
+    // requesting coordinate reference system (CRS) definitions or creating transformations; IsInitialized and
+    // GetEpsgVersion can be queried before initialization.
+    // On failure, GetEpsgVersion returns an empty string; GetCatalogueAxisNamesLabel, which requires initialization,
+    // returns an empty string if no axis name can be obtained; GetDetails returns an empty string for each text field it
+    // cannot read and 0 if it cannot read the axis count; GetCandidateOperations ignores a failure to create a
+    // transformation after CrsKit has supplied the candidate operations to the callback that GetCandidateOperations uses;
+    // after initialization, IsValidWkt, AreEquivalent and IsHorizontalComponentLocal return false, GetEpsgCode returns 0
+    // and GetWktFromGeoKeys returns an empty string. The other members throw on failure an exception that the projection
+    // of the caller's language raises.
     [default_interface]
     runtimeclass CrsEngine
     {
@@ -58,5 +71,36 @@ namespace Digi21.CrsKit.Interop
         // than one operation applies, the callback returns operationCode, for example a code from GetCandidateOperations.
         static Transformation CreateTransformationFromWktWithOperation(
             String sourceWkt, String targetWkt, Int32 operationCode);
+
+        // Returns true if wkt is one complete WKT element, NAME[...] with balanced brackets and quotes and nothing after it,
+        // that crskit parses into a coordinate reference system. The text check runs before parsing because crskit's
+        // parser can fail with an access violation on some truncated texts.
+        static Boolean IsValidWkt(String wkt);
+        // Returns true if both WKT define the same datum, prime meridian, projection with its parameters, and units. Names,
+        // authority codes and axis order are not compared.
+        static Boolean AreEquivalent(String firstWkt, String secondWkt);
+        // Returns the WKT of the horizontal component of wkt, or the WKT serialized from the parsed system when it is
+        // horizontal; returns an empty string for a vertical system.
+        static String GetHorizontalWkt(String wkt);
+        // Returns the WKT of the vertical component of wkt, or an empty string if the system has no vertical component.
+        static String GetVerticalWkt(String wkt);
+        // Returns true if the horizontal component of wkt is a local coordinate system.
+        static Boolean IsHorizontalComponentLocal(String wkt);
+        // Returns the WKT of the compound local system that represents an unknown coordinate reference system.
+        static String GetUnknownLocalWkt();
+        // Returns the EPSG code of wkt, or 0 if the WKT has no EPSG authority or crskit cannot parse it.
+        static Int32 GetEpsgCode(String wkt);
+        // Returns the WKT of the system that the GeoTIFF keys GTModelTypeGeoKey, ProjectedCSTypeGeoKey,
+        // GeographicTypeGeoKey and ProjectionGeoKey declare, as GeoTIFF files and the GeoTIFF records of LAS files store
+        // them. A geographic system has the longitude axis first. Returns an empty string if modelType is neither 1 nor 2,
+        // if modelType is 1 and both projectedCrsCode and projectionCode are 32767 (user-defined), or if crskit cannot build
+        // the system.
+        static String GetWktFromGeoKeys(UInt16 modelType, UInt16 projectedCrsCode, UInt16 geographicCrsCode, UInt16 projectionCode);
+        // Returns the unit of the first axis of the coordinate reference system parsed from wkt.
+        static CrsUnit GetFirstAxisUnit(String wkt);
+        // Creates a transformation whose input is {east, north}, or {longitude, latitude}, in the horizontal component of
+        // sourceWkt, whatever axis order the system declares, and whose output is {latitude, longitude} in WGS 84
+        // (EPSG:4326), in degrees.
+        static Transformation CreateEastNorthToWgs84LatitudeLongitude(String sourceWkt);
     }
 }

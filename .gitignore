@@ -260,5 +260,5 @@ __pycache__/
 
 # vcpkg manifest-mode installed tree (restored from vcpkg.json; never committed)
 vcpkg_installed/
-# The EPSG database is excluded from the repository and from the NuGet package.
+# The database of the EPSG (European Petroleum Survey Group) Geodetic Parameter Dataset is excluded from the repository and from the NuGet package.
 Data/

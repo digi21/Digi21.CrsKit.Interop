@@ -4,6 +4,7 @@
 #include <winrt/Windows.Foundation.Collections.h>
 
 #include <atomic>
+#include <cwctype>
 #include <format>
 #include <memory>
 #include <mutex>

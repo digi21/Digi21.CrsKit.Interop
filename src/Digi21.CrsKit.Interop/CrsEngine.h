@@ -28,6 +28,16 @@ namespace winrt::Digi21::CrsKit::Interop::implementation
             GetCandidateOperations(hstring const& sourceWkt, hstring const& targetWkt);
         static winrt::Digi21::CrsKit::Interop::Transformation CreateTransformationFromWktWithOperation(
             hstring const& sourceWkt, hstring const& targetWkt, int32_t operationCode);
+        static bool IsValidWkt(hstring const& wkt);
+        static bool AreEquivalent(hstring const& firstWkt, hstring const& secondWkt);
+        static hstring GetHorizontalWkt(hstring const& wkt);
+        static hstring GetVerticalWkt(hstring const& wkt);
+        static bool IsHorizontalComponentLocal(hstring const& wkt);
+        static hstring GetUnknownLocalWkt();
+        static int32_t GetEpsgCode(hstring const& wkt);
+        static hstring GetWktFromGeoKeys(uint16_t modelType, uint16_t projectedCrsCode, uint16_t geographicCrsCode, uint16_t projectionCode);
+        static winrt::Digi21::CrsKit::Interop::CrsUnit GetFirstAxisUnit(hstring const& wkt);
+        static winrt::Digi21::CrsKit::Interop::Transformation CreateEastNorthToWgs84LatitudeLongitude(hstring const& sourceWkt);
     };
 }
 
