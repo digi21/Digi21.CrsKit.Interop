@@ -104,6 +104,11 @@ namespace
     std::shared_ptr<CoordinateSystem> ApplyAxisOrder(
         std::shared_ptr<CoordinateSystem> const& coordinateSystem, winrt::Digi21::CrsKit::Interop::AxisOrder order)
     {
+        // ModifyWithAxisEastNorth and ModifyWithAxisNorthEast read the second axis without checking the dimension, so a
+        // system with fewer than two axes, such as a vertical system, keeps its catalogue definition.
+        if (coordinateSystem->GetDimension() < 2)
+            return coordinateSystem;
+
         switch (order)
         {
         case winrt::Digi21::CrsKit::Interop::AxisOrder::EastNorth:
@@ -451,9 +456,9 @@ namespace winrt::Digi21::CrsKit::Interop::implementation
         EnsureInitialized();
         try
         {
-            // ExtractHorizontalVertical returns the WKT of an unknown vertical system when it receives a WKT without a vertical
-            // component. For a parsed system without a vertical component, ExtractHorizontalVertical returns null for the
-            // vertical component, and GetVerticalWkt converts that null to an empty string.
+            // ExtractHorizontalVertical returns the Well-Known Text (WKT) of an unknown vertical system when it receives a WKT
+            // without a vertical component. For a parsed system without a vertical component, ExtractHorizontalVertical returns
+            // null for the vertical component, and GetVerticalWkt converts that null to an empty string.
             auto const vertical = GetUtilities()->ExtractHorizontalVertical(CreateCoordinateSystemFromWkt(wkt)).second;
             return vertical ? winrt::to_hstring(vertical->GetWkt()) : hstring{};
         }

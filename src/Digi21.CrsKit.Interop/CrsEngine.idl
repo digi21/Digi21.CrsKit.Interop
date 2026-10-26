@@ -23,7 +23,7 @@ namespace Digi21.CrsKit.Interop
     // cannot read and 0 if it cannot read the axis count; GetCandidateOperations ignores a failure to create a
     // transformation after CrsKit has supplied the candidate operations to the callback that GetCandidateOperations uses;
     // after initialization, IsValidWkt, AreEquivalent and IsHorizontalComponentLocal return false, GetEpsgCode returns 0
-    // and GetWktFromGeoKeys returns an empty string. Except in those failure cases, CrsEngine members report failures as
+    // and GetWktFromGeoKeys returns an empty string; in all other failure cases, CrsEngine members report failures as
     // exceptions in the caller's language.
     [default_interface]
     runtimeclass CrsEngine
@@ -45,7 +45,8 @@ namespace Digi21.CrsKit.Interop
 
         // CRS name, kind, axis count, area of use, datum name and origin, prime meridian name and ellipsoid name.
         static CrsDetails GetDetails(Int32 code);
-        // WKT of a CRS with a chosen axis order (Default keeps the EPSG definition).
+        // WKT of a CRS with a chosen axis order (Default keeps the EPSG definition). A system with fewer than two axes, such as
+        // a vertical system, keeps its catalogue definition for every order.
         static String GetWktWithAxisOrder(Int32 code, AxisOrder order);
         // Joins with "-" the non-empty names of the first two axes of a CRS, in catalogue order, e.g. "Lat-Long" or "E-N";
         // for a one-dimensional CRS, returns the name of its axis. Omits an axis whose name cannot be read. Returns an empty
