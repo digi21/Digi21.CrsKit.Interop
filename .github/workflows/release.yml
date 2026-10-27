@@ -1,0 +1,93 @@
+name: Release
+
+# On a push of a tag matching v*, the workflow builds, packs and publishes the package to nuget.org. Running the workflow by hand (workflow_dispatch) builds and
+# packs without publishing and uploads the .nupkg as an artifact, to check the build before tagging: a version published
+# to nuget.org cannot be deleted.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: windows-latest
+    permissions:
+      contents: write # the GitHub release
+      id-token: write # allows NuGet/login to exchange the job's OpenID Connect (OIDC) token for a temporary nuget.org API key
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # The component sets PlatformToolset v145, which only Visual Studio 18 provides.
+      - name: Require Visual Studio 18
+        run: |
+          $vswhereFilePath = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $installedVisualStudioVersions = & $vswhereFilePath -all -prerelease -property installationVersion
+          Write-Host "Visual Studio installations: $($installedVisualStudioVersions -join ', ')"
+          if (-not (& $vswhereFilePath -version '[18.0,19.0)' -prerelease -property installationPath)) {
+            throw 'the component needs PlatformToolset v145 (Visual Studio 18), and this runner has no Visual Studio 18'
+          }
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+        with:
+          vs-version: '[18.0,19.0)'
+          vs-prerelease: true
+
+      # The tag name must equal "v" followed by the Version value in Digi21.CrsKit.Interop.Projection.csproj.
+      - name: Check tag against package version
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        run: |
+          [xml]$project = Get-Content 'src/Digi21.CrsKit.Interop.Projection/Digi21.CrsKit.Interop.Projection.csproj'
+          $version = @($project.Project.PropertyGroup.Version | Where-Object { $_ })[0]
+          if ('${{ github.ref_name }}' -ne "v$version") { throw "tag ${{ github.ref_name }} does not match package version $version" }
+
+      # vcpkg uses the component's manifest to build crskit from the github.com/digi21/crskit registry through the MSBuild
+      # integration of the vcpkg installed on the runner.
+      - name: Integrate vcpkg
+        run: '& "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" integrate install'
+
+      - name: Restore
+        run: msbuild Digi21.CrsKit.Interop.sln -t:restore -p:RestorePackagesConfig=true -p:Platform=x64
+
+      - name: Build
+        run: msbuild Digi21.CrsKit.Interop.sln -p:Configuration=Release -p:Platform=x64 -m
+
+      - name: Pack
+        run: msbuild src/Digi21.CrsKit.Interop.Projection/Digi21.CrsKit.Interop.Projection.csproj -t:pack -p:Configuration=Release -p:Platform=x64 -p:NoBuild=true "-p:PackageOutputPath=$env:GITHUB_WORKSPACE\artifacts"
+
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: Digi21.CrsKit.Interop
+          path: artifacts/*.nupkg
+          if-no-files-found: error
+
+      # Trusted publishing: NuGet/login exchanges this job's OpenID Connect (OIDC) token for a nuget.org API key that expires
+      # after one hour, so there is no long-lived secret to store or rotate.
+      - name: NuGet login
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        uses: NuGet/login@v1
+        id: login
+        with:
+          user: ${{ secrets.NUGET_USER }} # the nuget.org profile name, not the email address
+
+      # `dotnet nuget push` on Windows only expands a wildcard written with backslashes; pushing each file by full path
+      # avoids the wildcard.
+      - name: Push to NuGet.org
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        run: |
+          $packages = @(Get-ChildItem artifacts\*.nupkg)
+          if ($packages.Count -eq 0) { throw "no .nupkg files were found in the artifacts directory" }
+          foreach ($package in $packages) {
+            Write-Host "pushing $($package.Name)"
+            dotnet nuget push $package.FullName --api-key ${{ steps.login.outputs.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+            if ($LASTEXITCODE -ne 0) { throw "push failed for $($package.Name)" }
+          }
+
+      - name: Create GitHub release
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*.nupkg
+          generate_release_notes: true
