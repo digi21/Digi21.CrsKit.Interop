@@ -65,7 +65,7 @@ namespace
     }
 
     // Returns true if wkt is one element KEYWORD[...] whose brackets and quotes are balanced and that has nothing after it. The keyword
-    // contains letters and underscores, as in COMPD_CS, VERT_CS and LOCAL_CS.
+    // may contain letters, underscores, or both, as in COMPD_CS, VERT_CS and LOCAL_CS.
     // crskit's parser can fail with an access violation on some truncated texts, such as "]" or a PROJCS cut inside AXIS.
     bool IsCompleteWktElement(std::wstring_view const wkt)
     {
