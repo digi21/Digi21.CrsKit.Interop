@@ -64,12 +64,13 @@ namespace
             winrt::to_hstring(gridFiles));
     }
 
-    // Returns true if wkt is one element NAME[...] whose brackets and quotes are balanced and that has nothing after it.
+    // Returns true if wkt is one element KEYWORD[...] whose brackets and quotes are balanced and that has nothing after it. The keyword
+    // contains letters and underscores, as in COMPD_CS, VERT_CS and LOCAL_CS.
     // crskit's parser can fail with an access violation on some truncated texts, such as "]" or a PROJCS cut inside AXIS.
     bool IsCompleteWktElement(std::wstring_view const wkt)
     {
         size_t wktCharacterIndex{};
-        while (wktCharacterIndex < wkt.size() && iswalpha(wkt[wktCharacterIndex]))
+        while (wktCharacterIndex < wkt.size() && (iswalpha(wkt[wktCharacterIndex]) || L'_' == wkt[wktCharacterIndex]))
             ++wktCharacterIndex;
         if (0 == wktCharacterIndex || wktCharacterIndex >= wkt.size() || L'[' != wkt[wktCharacterIndex])
             return false;
