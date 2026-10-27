@@ -477,6 +477,17 @@ namespace winrt::Digi21::CrsKit::Interop::implementation
         catch (...) { return false; }
     }
 
+    bool CrsEngine::IsVerticalComponentLocal(hstring const& wkt)
+    {
+        EnsureInitialized();
+        try
+        {
+            auto const vertical = GetUtilities()->ExtractHorizontalVertical(CreateCoordinateSystemFromWkt(wkt)).second;
+            return nullptr != std::dynamic_pointer_cast<LocalCoordinateSystem>(vertical);
+        }
+        catch (...) { return false; }
+    }
+
     hstring CrsEngine::GetUnknownLocalWkt()
     {
         EnsureInitialized();

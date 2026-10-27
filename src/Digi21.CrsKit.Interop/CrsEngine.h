@@ -33,6 +33,7 @@ namespace winrt::Digi21::CrsKit::Interop::implementation
         static hstring GetHorizontalWkt(hstring const& wkt);
         static hstring GetVerticalWkt(hstring const& wkt);
         static bool IsHorizontalComponentLocal(hstring const& wkt);
+        static bool IsVerticalComponentLocal(hstring const& wkt);
         static hstring GetUnknownLocalWkt();
         static int32_t GetEpsgCode(hstring const& wkt);
         static hstring GetWktFromGeoKeys(uint16_t modelType, uint16_t projectedCrsCode, uint16_t geographicCrsCode, uint16_t projectionCode);

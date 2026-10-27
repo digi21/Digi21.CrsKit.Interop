@@ -35,7 +35,7 @@ namespace Digi21.CrsKit.Interop
     // returns an empty string if no axis name can be obtained; GetDetails returns an empty string for each text field it
     // cannot read and 0 if it cannot read the axis count; GetCandidateOperations ignores a failure to create a
     // transformation after CrsKit has supplied the candidate operations to the callback that GetCandidateOperations uses;
-    // after initialization, IsValidWkt, AreEquivalent and IsHorizontalComponentLocal return false, GetEpsgCode returns 0
+    // after initialization, IsValidWkt, AreEquivalent, IsHorizontalComponentLocal and IsVerticalComponentLocal return false, GetEpsgCode returns 0
     // and GetWktFromGeoKeys returns an empty string; in all other failure cases, CrsEngine members report failures as
     // exceptions in the caller's language.
     [default_interface]
@@ -100,6 +100,8 @@ namespace Digi21.CrsKit.Interop
         static String GetVerticalWkt(String wkt);
         // Returns true if the horizontal component of wkt is a local coordinate system.
         static Boolean IsHorizontalComponentLocal(String wkt);
+        // Returns true if the vertical component of wkt is a local coordinate system; returns false if wkt has no vertical component.
+        static Boolean IsVerticalComponentLocal(String wkt);
         // Returns the WKT of the compound local system that represents an unknown coordinate reference system.
         static String GetUnknownLocalWkt();
         // Returns the EPSG code of wkt, or 0 if the WKT has no EPSG authority or crskit cannot parse it.
