@@ -14,6 +14,19 @@ namespace Digi21.CrsKit.Interop
         Double RadiansPerUnit;    // 0 when IsAngular is false
     };
 
+    // Direction of an axis of a coordinate reference system, returned by CrsEngine.GetFirstAxisOrientation. The values are those of
+    // crskit's AxisOrientationEnum.
+    enum AxisOrientation
+    {
+        Other = 0,
+        North = 1,
+        South = 2,
+        East = 3,
+        West = 4,
+        Up = 5,      // a height: coordinate values increase in the upward direction
+        Down = 6,    // a depth: coordinate values increase in the downward direction
+    };
+
     // Process-wide entry point to the CrsKit library. Call Initialize once, with the path of the SQLite database of the
     // EPSG (European Petroleum Survey Group) Geodetic Parameter Dataset and the directory of the grid files, before
     // requesting coordinate reference system (CRS) definitions or creating transformations; IsInitialized and
@@ -99,6 +112,9 @@ namespace Digi21.CrsKit.Interop
         static String GetWktFromGeoKeys(UInt16 modelType, UInt16 projectedCrsCode, UInt16 geographicCrsCode, UInt16 projectionCode);
         // Returns the unit of the first axis of the coordinate reference system parsed from wkt.
         static CrsUnit GetFirstAxisUnit(String wkt);
+        // Returns the direction of the first axis of the coordinate reference system parsed from wkt. For the vertical component
+        // of a compound system, pass the WKT that GetVerticalWkt returns.
+        static AxisOrientation GetFirstAxisOrientation(String wkt);
         // Creates a transformation whose input is {east, north}, or {longitude, latitude}, in the horizontal component of
         // sourceWkt, whatever axis order the system declares, and whose output is {latitude, longitude} in WGS 84
         // (EPSG:4326), in degrees.

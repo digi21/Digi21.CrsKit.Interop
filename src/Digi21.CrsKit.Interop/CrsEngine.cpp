@@ -531,6 +531,18 @@ namespace winrt::Digi21::CrsKit::Interop::implementation
         catch (std::exception const& e) { ThrowWinrtError(e); }
     }
 
+    winrt::Digi21::CrsKit::Interop::AxisOrientation CrsEngine::GetFirstAxisOrientation(hstring const& wkt)
+    {
+        EnsureInitialized();
+        try
+        {
+            // The values of AxisOrientation are those of crskit's AxisOrientationEnum.
+            return static_cast<winrt::Digi21::CrsKit::Interop::AxisOrientation>(CreateCoordinateSystemFromWkt(wkt)->GetAxis(0).GetOrientation());
+        }
+        catch (winrt::hresult_error const&) { throw; }
+        catch (std::exception const& e) { ThrowWinrtError(e); }
+    }
+
     winrt::Digi21::CrsKit::Interop::Transformation CrsEngine::CreateEastNorthToWgs84LatitudeLongitude(hstring const& sourceWkt)
     {
         EnsureInitialized();

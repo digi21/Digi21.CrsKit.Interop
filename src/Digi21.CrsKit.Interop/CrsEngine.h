@@ -37,6 +37,7 @@ namespace winrt::Digi21::CrsKit::Interop::implementation
         static int32_t GetEpsgCode(hstring const& wkt);
         static hstring GetWktFromGeoKeys(uint16_t modelType, uint16_t projectedCrsCode, uint16_t geographicCrsCode, uint16_t projectionCode);
         static winrt::Digi21::CrsKit::Interop::CrsUnit GetFirstAxisUnit(hstring const& wkt);
+        static winrt::Digi21::CrsKit::Interop::AxisOrientation GetFirstAxisOrientation(hstring const& wkt);
         static winrt::Digi21::CrsKit::Interop::Transformation CreateEastNorthToWgs84LatitudeLongitude(hstring const& sourceWkt);
     };
 }
