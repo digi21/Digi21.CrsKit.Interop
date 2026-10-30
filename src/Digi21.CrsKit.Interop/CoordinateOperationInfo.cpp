@@ -7,10 +7,10 @@ namespace winrt::Digi21::CrsKit::Interop::implementation
     CoordinateOperationInfo::CoordinateOperationInfo(int32_t code, hstring const& name, hstring const& type,
                                                      winrt::Windows::Foundation::IReference<double> const& accuracyMetres,
                                                      hstring const& scope, hstring const& remarks, int32_t methodCode,
-                                                     hstring const& areaOfUse, hstring const& gridFiles)
+                                                     hstring const& areaOfUse, hstring const& gridFiles, hstring const& missingGridFiles)
         : _code{ code }, _name{ name }, _type{ type }, _accuracyMetres{ accuracyMetres }
         , _scope{ scope }, _remarks{ remarks }, _methodCode{ methodCode }
-        , _areaOfUse{ areaOfUse }, _gridFiles{ gridFiles }
+        , _areaOfUse{ areaOfUse }, _gridFiles{ gridFiles }, _missingGridFiles{ missingGridFiles }
     {
     }
 
@@ -23,4 +23,5 @@ namespace winrt::Digi21::CrsKit::Interop::implementation
     int32_t CoordinateOperationInfo::MethodCode() { return _methodCode; }
     hstring CoordinateOperationInfo::AreaOfUse() { return _areaOfUse; }
     hstring CoordinateOperationInfo::GridFiles() { return _gridFiles; }
+    hstring CoordinateOperationInfo::MissingGridFiles() { return _missingGridFiles; }
 }

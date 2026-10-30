@@ -9,7 +9,7 @@ namespace winrt::Digi21::CrsKit::Interop::implementation
         CoordinateOperationInfo(int32_t code, hstring const& name, hstring const& type,
                                 winrt::Windows::Foundation::IReference<double> const& accuracyMetres,
                                 hstring const& scope, hstring const& remarks, int32_t methodCode,
-                                hstring const& areaOfUse, hstring const& gridFiles);
+                                hstring const& areaOfUse, hstring const& gridFiles, hstring const& missingGridFiles);
 
         int32_t Code();
         hstring Name();
@@ -20,6 +20,7 @@ namespace winrt::Digi21::CrsKit::Interop::implementation
         int32_t MethodCode();
         hstring AreaOfUse();
         hstring GridFiles();
+        hstring MissingGridFiles();
 
     private:
         int32_t _code{};
@@ -31,6 +32,7 @@ namespace winrt::Digi21::CrsKit::Interop::implementation
         int32_t _methodCode{};
         hstring _areaOfUse;
         hstring _gridFiles;
+        hstring _missingGridFiles;
     };
 }
 

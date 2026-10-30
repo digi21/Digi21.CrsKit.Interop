@@ -17,7 +17,7 @@
 
   <PropertyGroup>
     <PackageId>Digi21.CrsKit.Interop</PackageId>
-    <Version>1.0.0-preview.5</Version>
+    <Version>1.0.0-preview.6</Version>
     <Authors>Digi21</Authors>
     <Description>Windows Runtime component and C# projection over crskit: EPSG catalogue, Well-Known Text (WKT) definitions and coordinate transformations. x64 only.</Description>
     <PackageTags>crs;epsg;wkt;coordinates;projection;winrt</PackageTags>

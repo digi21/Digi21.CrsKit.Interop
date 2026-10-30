@@ -45,12 +45,16 @@ namespace
             accuracy = winrt::box_value(candidateOperation.Accuracy.value())
                            .as<winrt::Windows::Foundation::IReference<double>>();
 
-        std::string gridFiles;
-        for (auto const& file : candidateOperation.GridFiles)
+        auto const joinWithCommas = [](std::vector<std::string> const& names)
         {
-            if (!gridFiles.empty()) gridFiles += ", ";
-            gridFiles += file;
-        }
+            std::string joined;
+            for (auto const& name : names)
+            {
+                if (!joined.empty()) joined += ", ";
+                joined += name;
+            }
+            return joined;
+        };
 
         return winrt::make<winrt::Digi21::CrsKit::Interop::implementation::CoordinateOperationInfo>(
             candidateOperation.Code,
@@ -61,7 +65,8 @@ namespace
             winrt::to_hstring(candidateOperation.Remarks.value_or("")),
             candidateOperation.MethodCode,
             winrt::to_hstring(candidateOperation.AreaOfUse),
-            winrt::to_hstring(gridFiles));
+            winrt::to_hstring(joinWithCommas(candidateOperation.GridFiles)),
+            winrt::to_hstring(joinWithCommas(::CrsKit::GetMissingGridFiles(candidateOperation))));
     }
 
     // Returns the candidate operations that CrsKit passes to selectOperation, or an empty list when CrsKit builds the transformation
@@ -128,45 +133,82 @@ namespace
         return { point[1] * degreesPerUnit, point[0] * degreesPerUnit + primeMeridianLongitudeDegrees };
     }
 
-    // Returns true when candidateOperation has an accuracy and selectedOperation has none or a larger one.
-    bool IsMoreAccurate(CoordinateOperation const& candidateOperation, CoordinateOperation const& selectedOperation)
+    // Creates the transformation from source to target with the operation whose EPSG code is operationCode. Returns nullptr if CrsKit
+    // cannot create the transformation, for example because CrsKit does not implement the method of the operation.
+    std::shared_ptr<ICoordinateTransformation> TryCreateTransformationWithOperation(std::shared_ptr<CoordinateSystem> const& source,
+                                                                                    std::shared_ptr<CoordinateSystem> const& target, int const operationCode)
     {
-        return candidateOperation.Accuracy && (!selectedOperation.Accuracy || *candidateOperation.Accuracy < *selectedOperation.Accuracy);
+        CoordinateTransformationOptions options{};
+        options.selectOperation = [operationCode](std::string const&, std::string const&, std::vector<CoordinateOperation> const&) -> int { return operationCode; };
+        try
+        {
+            return GetCoordinateTransformationFactory()->CreateFromCoordinateSystems(source, target, options);
+        }
+        catch (std::exception const&)
+        {
+            return nullptr;
+        }
     }
 
-    // Among the candidate operations whose area-of-use bounding box contains the position, returns the code of the most accurate one
-    // whose grid files are installed or, if none, of the most accurate one without grid files. Returns 0 when the area-of-use bounding
-    // box of no candidate operation contains the position.
-    int SelectOperationForPosition(std::vector<CoordinateOperation> const& candidateOperations, double const latitudeDegrees, double const longitudeDegrees)
+    // Returns the candidate operations that have missing grid files or with which CrsKit can create a transformation. Operations with
+    // missing grid files are retained without testing whether CrsKit can create their transformations.
+    std::vector<CoordinateOperation> SelectCandidateOperationsWithMissingGridsOrCreatableTransformation(std::shared_ptr<CoordinateSystem> const& source, std::shared_ptr<CoordinateSystem> const& target,
+                                                                     std::vector<CoordinateOperation> const& candidateOperations)
     {
-        bool hasCandidateBoundingBoxContainingPosition{ false };
-        CoordinateOperation const* operationWithInstalledGrids{ nullptr };
-        CoordinateOperation const* operationWithoutGrids{ nullptr };
+        std::vector<CoordinateOperation> candidateOperationsWithMissingGridsOrCreatableTransformation;
+        for (auto const& candidateOperation : candidateOperations)
+            if (!::CrsKit::GetMissingGridFiles(candidateOperation).empty() || TryCreateTransformationWithOperation(source, target, candidateOperation.Code))
+                candidateOperationsWithMissingGridsOrCreatableTransformation.push_back(candidateOperation);
+        return candidateOperationsWithMissingGridsOrCreatableTransformation;
+    }
+
+    // Accuracy in metres used to order candidate operations; an operation without a stated accuracy goes after every operation with one.
+    double GetAccuracyForOrdering(CoordinateOperation const& candidateOperation)
+    {
+        return candidateOperation.Accuracy.value_or(std::numeric_limits<double>::infinity());
+    }
+
+    // Considers the candidate operations whose area-of-use bounding box contains the position. Tries the operations that need grid files
+    // and have none missing until CrsKit creates a transformation with one of them; if every attempt fails, tries the operations that need
+    // no grid file in the same way. Within each group, tries the operations with a stated accuracy in ascending order of accuracy in
+    // metres, then the operations without a stated accuracy, and returns the first transformation that CrsKit creates. Returns nullptr
+    // when the area-of-use bounding box of no candidate operation contains the position, and throws if CrsKit cannot create a
+    // transformation with any candidate operation whose area-of-use bounding box contains the position.
+    std::shared_ptr<ICoordinateTransformation> CreateTransformationForPosition(std::shared_ptr<CoordinateSystem> const& source, std::shared_ptr<CoordinateSystem> const& target,
+                                                              std::vector<CoordinateOperation> const& candidateOperations,
+                                                              double const latitudeDegrees, double const longitudeDegrees)
+    {
+        std::vector<CoordinateOperation const*> operationsWithInstalledGrids;
+        std::vector<CoordinateOperation const*> operationsWithoutGrids;
+        bool hasOperationWithMissingGrids{ false };
         for (auto const& candidateOperation : candidateOperations)
         {
             if (!candidateOperation.AreaOfUseBoundingBox || !candidateOperation.AreaOfUseBoundingBox->Contains(latitudeDegrees, longitudeDegrees))
                 continue;
-            hasCandidateBoundingBoxContainingPosition = true;
             if (candidateOperation.GridFiles.empty())
-            {
-                if (nullptr == operationWithoutGrids || IsMoreAccurate(candidateOperation, *operationWithoutGrids))
-                    operationWithoutGrids = &candidateOperation;
-            }
+                operationsWithoutGrids.push_back(&candidateOperation);
             else if (::CrsKit::GetMissingGridFiles(candidateOperation).empty())
-            {
-                if (nullptr == operationWithInstalledGrids || IsMoreAccurate(candidateOperation, *operationWithInstalledGrids))
-                    operationWithInstalledGrids = &candidateOperation;
-            }
+                operationsWithInstalledGrids.push_back(&candidateOperation);
+            else
+                hasOperationWithMissingGrids = true;
         }
 
-        if (!hasCandidateBoundingBoxContainingPosition)
-            return 0;
-        if (nullptr != operationWithInstalledGrids)
-            return operationWithInstalledGrids->Code;
-        if (nullptr != operationWithoutGrids)
-            return operationWithoutGrids->Code;
+        if (operationsWithInstalledGrids.empty() && operationsWithoutGrids.empty() && !hasOperationWithMissingGrids)
+            return nullptr;
+
+        auto const isMoreAccurate = [](CoordinateOperation const* first, CoordinateOperation const* second)
+        {
+            return GetAccuracyForOrdering(*first) < GetAccuracyForOrdering(*second);
+        };
+        std::ranges::stable_sort(operationsWithInstalledGrids, isMoreAccurate);
+        std::ranges::stable_sort(operationsWithoutGrids, isMoreAccurate);
+        for (auto const* operations : { &operationsWithInstalledGrids, &operationsWithoutGrids })
+            for (auto const* candidateOperation : *operations)
+                if (auto transformation = TryCreateTransformationWithOperation(source, target, candidateOperation->Code))
+                    return transformation;
+
         throw std::runtime_error(std::format(
-            "Every candidate datum shift to WGS 84 whose area-of-use bounding box contains latitude {} and longitude {} degrees needs a grid file that is not installed.",
+            "CrsKit cannot create a transformation to WGS 84 with any candidate datum shift whose area-of-use bounding box contains latitude {} and longitude {} degrees.",
             latitudeDegrees, longitudeDegrees));
     }
 
@@ -646,28 +688,19 @@ namespace winrt::Digi21::CrsKit::Interop::implementation
             auto const [source, target] = CreateEastNorthSourceAndWgs84Target(sourceWkt);
             auto const [latitudeDegrees, longitudeDegrees] = GetLatitudeLongitudeDegrees(source, eastInSourceUnits, northInSourceUnits);
 
-            bool noCandidateBoundingBoxContainsPosition{ false };
-            CoordinateTransformationOptions options{};
-            options.selectOperation = [&](std::string const&, std::string const&, std::vector<CoordinateOperation> const& candidateOperations) -> int
-            {
-                auto const operationCode = SelectOperationForPosition(candidateOperations, latitudeDegrees, longitudeDegrees);
-                noCandidateBoundingBoxContainsPosition = 0 == operationCode;
-                return operationCode;
-            };
-
             std::shared_ptr<ICoordinateTransformation> coordinateTransformation;
-            try
+            auto const candidateOperations = CollectCandidateOperations(source, target);
+            if (candidateOperations.empty())
             {
-                coordinateTransformation = GetCoordinateTransformationFactory()->CreateFromCoordinateSystems(source, target, options);
+                // CrsKit invokes no selectOperation callback when at most one operation applies.
+                coordinateTransformation = GetCoordinateTransformationFactory()->CreateFromCoordinateSystems(source, target);
             }
-            catch (std::exception const&)
+            else
             {
-                if (!noCandidateBoundingBoxContainsPosition)
-                    throw;
+                coordinateTransformation = CreateTransformationForPosition(source, target, candidateOperations, latitudeDegrees, longitudeDegrees);
+                if (!coordinateTransformation)
+                    return nullptr;
             }
-            // When selectOperation returns 0, CrsKit throws or returns no transformation.
-            if (noCandidateBoundingBoxContainsPosition)
-                return nullptr;
             if (!coordinateTransformation)
                 throw winrt::hresult_error(E_FAIL, L"No coordinate operation converts the horizontal component of sourceWkt to WGS 84.");
             return winrt::make<implementation::Transformation>(coordinateTransformation);
@@ -684,7 +717,7 @@ namespace winrt::Digi21::CrsKit::Interop::implementation
         {
             auto const [source, target] = CreateEastNorthSourceAndWgs84Target(sourceWkt);
             auto result = winrt::single_threaded_vector<winrt::Digi21::CrsKit::Interop::CoordinateOperationInfo>();
-            for (auto const& candidateOperation : CollectCandidateOperations(source, target))
+            for (auto const& candidateOperation : SelectCandidateOperationsWithMissingGridsOrCreatableTransformation(source, target, CollectCandidateOperations(source, target)))
                 result.Append(MakeOperationInfo(candidateOperation));
             return result.GetView();
         }

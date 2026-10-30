@@ -14,5 +14,6 @@ namespace Digi21.CrsKit.Interop
         Int32  MethodCode{ get; };                       // EPSG method (algorithm) code
         String AreaOfUse{ get; };                        // EPSG area of use (geographic extent), "" if none
         String GridFiles{ get; };                        // grid file(s) the operation needs, comma-separated, "" if none
+        String MissingGridFiles{ get; };                 // grid file(s) of GridFiles not found in the grid files directory, comma-separated, "" if none
     }
 }

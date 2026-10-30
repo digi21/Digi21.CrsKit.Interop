@@ -121,15 +121,21 @@ namespace Digi21.CrsKit.Interop
         // sourceWkt, whatever axis order the system declares, and whose output is {latitude, longitude} in WGS 84
         // (EPSG:4326), in degrees. eastInSourceUnits and northInSourceUnits are in the units of the horizontal component of
         // sourceWkt. Before creating the transformation, the method converts {eastInSourceUnits, northInSourceUnits} to latitude
-        // and longitude in the datum of sourceWkt. When several datum shifts to WGS 84 apply, crskit invokes selectOperation and
-        // the method selects, among the operations whose area-of-use bounding box contains that latitude and longitude, the most
-        // accurate one whose grid files are installed or, if none, the most accurate one that needs no grid file. When crskit
-        // invokes selectOperation, the method returns null if the area-of-use bounding box of no candidate operation contains the
-        // position, and throws if every candidate operation whose area-of-use bounding box contains the position needs a grid
-        // file that is not installed.
+        // and longitude in the datum of sourceWkt. When several datum shifts to WGS 84 apply, the method considers the operations
+        // whose area-of-use bounding box contains the latitude and longitude calculated from {eastInSourceUnits,
+        // northInSourceUnits}. The method tries the operations that need grid files and have none missing until crskit creates
+        // the transformation with one of them; if every attempt fails, the method tries the operations that need no grid file in
+        // the same way. Within each group, the method tries the operations with a stated accuracy in ascending order of accuracy
+        // in metres, then the operations without a stated accuracy. crskit cannot create the transformation, for example, with an
+        // operation whose method crskit does not implement. When several datum shifts apply, the method returns null if the
+        // area-of-use bounding box of no candidate operation contains the position, and throws if crskit cannot create the
+        // transformation with any candidate operation whose area-of-use bounding box contains the position.
         static Transformation CreateEastNorthToWgs84LatitudeLongitude(String sourceWkt, Double eastInSourceUnits, Double northInSourceUnits);
-        // Returns the datum shifts to WGS 84 among which CreateEastNorthToWgs84LatitudeLongitude selects, or an empty list when
-        // at most one applies.
+        // Returns the datum shifts to WGS 84 among which CreateEastNorthToWgs84LatitudeLongitude selects, without the operations
+        // with which crskit cannot create the transformation although none of their grid files is missing, such as an operation
+        // whose method crskit does not implement. Keeps the operations that have missing grid files; the MissingGridFiles property
+        // of each returned CoordinateOperationInfo lists the missing grid files. Returns an empty list when at most one datum shift
+        // applies.
         static Windows.Foundation.Collections.IVectorView<CoordinateOperationInfo> GetEastNorthToWgs84CandidateOperations(String sourceWkt);
         // Creates a transformation with the same input and output as CreateEastNorthToWgs84LatitudeLongitude, using the datum
         // shift whose EPSG code is operationCode, for example a code from GetEastNorthToWgs84CandidateOperations.
