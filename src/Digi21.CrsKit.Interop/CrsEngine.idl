@@ -119,7 +119,20 @@ namespace Digi21.CrsKit.Interop
         static AxisOrientation GetFirstAxisOrientation(String wkt);
         // Creates a transformation whose input is {east, north}, or {longitude, latitude}, in the horizontal component of
         // sourceWkt, whatever axis order the system declares, and whose output is {latitude, longitude} in WGS 84
-        // (EPSG:4326), in degrees.
-        static Transformation CreateEastNorthToWgs84LatitudeLongitude(String sourceWkt);
+        // (EPSG:4326), in degrees. eastInSourceUnits and northInSourceUnits are in the units of the horizontal component of
+        // sourceWkt. Before creating the transformation, the method converts {eastInSourceUnits, northInSourceUnits} to latitude
+        // and longitude in the datum of sourceWkt. When several datum shifts to WGS 84 apply, crskit invokes selectOperation and
+        // the method selects, among the operations whose area-of-use bounding box contains that latitude and longitude, the most
+        // accurate one whose grid files are installed or, if none, the most accurate one that needs no grid file. When crskit
+        // invokes selectOperation, the method returns null if the area-of-use bounding box of no candidate operation contains the
+        // position, and throws if every candidate operation whose area-of-use bounding box contains the position needs a grid
+        // file that is not installed.
+        static Transformation CreateEastNorthToWgs84LatitudeLongitude(String sourceWkt, Double eastInSourceUnits, Double northInSourceUnits);
+        // Returns the datum shifts to WGS 84 among which CreateEastNorthToWgs84LatitudeLongitude selects, or an empty list when
+        // at most one applies.
+        static Windows.Foundation.Collections.IVectorView<CoordinateOperationInfo> GetEastNorthToWgs84CandidateOperations(String sourceWkt);
+        // Creates a transformation with the same input and output as CreateEastNorthToWgs84LatitudeLongitude, using the datum
+        // shift whose EPSG code is operationCode, for example a code from GetEastNorthToWgs84CandidateOperations.
+        static Transformation CreateEastNorthToWgs84LatitudeLongitudeWithOperation(String sourceWkt, Int32 operationCode);
     }
 }

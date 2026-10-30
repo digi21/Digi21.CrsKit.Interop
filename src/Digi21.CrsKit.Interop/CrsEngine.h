@@ -39,7 +39,11 @@ namespace winrt::Digi21::CrsKit::Interop::implementation
         static hstring GetWktFromGeoKeys(uint16_t modelType, uint16_t projectedCrsCode, uint16_t geographicCrsCode, uint16_t projectionCode);
         static winrt::Digi21::CrsKit::Interop::CrsUnit GetFirstAxisUnit(hstring const& wkt);
         static winrt::Digi21::CrsKit::Interop::AxisOrientation GetFirstAxisOrientation(hstring const& wkt);
-        static winrt::Digi21::CrsKit::Interop::Transformation CreateEastNorthToWgs84LatitudeLongitude(hstring const& sourceWkt);
+        static winrt::Digi21::CrsKit::Interop::Transformation CreateEastNorthToWgs84LatitudeLongitude(hstring const& sourceWkt, double eastInSourceUnits, double northInSourceUnits);
+        static winrt::Windows::Foundation::Collections::IVectorView<winrt::Digi21::CrsKit::Interop::CoordinateOperationInfo>
+            GetEastNorthToWgs84CandidateOperations(hstring const& sourceWkt);
+        static winrt::Digi21::CrsKit::Interop::Transformation CreateEastNorthToWgs84LatitudeLongitudeWithOperation(
+            hstring const& sourceWkt, int32_t operationCode);
     };
 }
 

@@ -64,6 +64,112 @@ namespace
             winrt::to_hstring(gridFiles));
     }
 
+    // Returns the candidate operations that CrsKit passes to selectOperation, or an empty list when CrsKit builds the transformation
+    // without invoking the callback because at most one operation applies.
+    std::vector<CoordinateOperation> CollectCandidateOperations(std::shared_ptr<CoordinateSystem> const& source, std::shared_ptr<CoordinateSystem> const& target)
+    {
+        std::vector<CoordinateOperation> candidateOperations;
+        bool hasReceivedCandidateOperations{ false };
+        CoordinateTransformationOptions options{};
+        options.selectOperation =
+            [&candidateOperations, &hasReceivedCandidateOperations](std::string const&, std::string const&,
+                                     std::vector<CoordinateOperation> const& availableCandidateOperations) -> int
+            {
+                candidateOperations = availableCandidateOperations;
+                hasReceivedCandidateOperations = true;
+                return availableCandidateOperations.empty() ? 0 : availableCandidateOperations.front().Code; // CollectCandidateOperations discards the transformation if CrsKit creates one with the first operation
+            };
+
+        try
+        {
+            (void)GetCoordinateTransformationFactory()->CreateFromCoordinateSystems(source, target, options);
+        }
+        catch (...)
+        {
+            // After CrsKit has passed the candidate operations, a failure to create the transformation with the first candidate operation does not propagate:
+            // another candidate may be usable. The failure propagates only if CrsKit did not invoke the callback.
+            if (!hasReceivedCandidateOperations) throw;
+        }
+        return candidateOperations;
+    }
+
+    // Creates and returns two coordinate systems: the horizontal component of sourceWkt with its axes ordered east, north, and
+    // WGS 84 (EPSG:4326) with its axes ordered latitude, longitude.
+    std::pair<std::shared_ptr<CoordinateSystem>, std::shared_ptr<CoordinateSystem>> CreateEastNorthSourceAndWgs84Target(winrt::hstring const& sourceWkt)
+    {
+        auto const utilities = GetUtilities();
+        auto const horizontalWkt = utilities->ExtractHorizontalVertical(winrt::to_string(sourceWkt)).first;
+        return { GetCoordinateSystemFactory()->CreateFromWkt(utilities->GetWktWithEastNorthAxes(horizontalWkt)),
+                 GetCoordinateSystemAuthorityFactory()->CreateGeographicCoordinateSystem(4326) };
+    }
+
+    // Returns {latitude, longitude} in degrees, with the longitude measured from Greenwich, in the datum of source, of the point {east, north} of source, whose
+    // axes are east and north. The conversion to the base geographic system of a projected source does not change the datum.
+    std::pair<double, double> GetLatitudeLongitudeDegrees(std::shared_ptr<CoordinateSystem> const& source, double const east, double const north)
+    {
+        std::shared_ptr<IGeographicCoordinateSystem> geographic = std::dynamic_pointer_cast<GeographicCoordinateSystem>(source);
+        std::vector<double> point{ east, north };
+        if (!geographic)
+        {
+            auto const projected = std::dynamic_pointer_cast<ProjectedCoordinateSystem>(source);
+            if (!projected)
+                throw winrt::hresult_error(E_INVALIDARG, L"The horizontal component of sourceWkt is neither projected nor geographic.");
+            geographic = projected->GetGeographicCoordinateSystem();
+            point = GetCoordinateTransformationFactory()->CreateFromCoordinateSystems(projected, std::dynamic_pointer_cast<CoordinateSystem>(geographic))
+                        ->GetMathTransform()->Transform(point);
+            if (AxisOrientationEnum::North == geographic->GetAxis(0).GetOrientation())
+                std::swap(point[0], point[1]);
+        }
+
+        constexpr double degreesPerRadian{ 180.0 / std::numbers::pi };
+        auto const degreesPerUnit = geographic->GetAngularUnit().GetRadiansPerUnit() * degreesPerRadian;
+        auto const primeMeridian = geographic->GetPrimeMeridian();
+        auto const primeMeridianLongitudeDegrees = primeMeridian.GetLongitude() * primeMeridian.GetAngularUnit().GetRadiansPerUnit() * degreesPerRadian;
+        return { point[1] * degreesPerUnit, point[0] * degreesPerUnit + primeMeridianLongitudeDegrees };
+    }
+
+    // Returns true when candidateOperation has an accuracy and selectedOperation has none or a larger one.
+    bool IsMoreAccurate(CoordinateOperation const& candidateOperation, CoordinateOperation const& selectedOperation)
+    {
+        return candidateOperation.Accuracy && (!selectedOperation.Accuracy || *candidateOperation.Accuracy < *selectedOperation.Accuracy);
+    }
+
+    // Among the candidate operations whose area-of-use bounding box contains the position, returns the code of the most accurate one
+    // whose grid files are installed or, if none, of the most accurate one without grid files. Returns 0 when the area-of-use bounding
+    // box of no candidate operation contains the position.
+    int SelectOperationForPosition(std::vector<CoordinateOperation> const& candidateOperations, double const latitudeDegrees, double const longitudeDegrees)
+    {
+        bool hasCandidateBoundingBoxContainingPosition{ false };
+        CoordinateOperation const* operationWithInstalledGrids{ nullptr };
+        CoordinateOperation const* operationWithoutGrids{ nullptr };
+        for (auto const& candidateOperation : candidateOperations)
+        {
+            if (!candidateOperation.AreaOfUseBoundingBox || !candidateOperation.AreaOfUseBoundingBox->Contains(latitudeDegrees, longitudeDegrees))
+                continue;
+            hasCandidateBoundingBoxContainingPosition = true;
+            if (candidateOperation.GridFiles.empty())
+            {
+                if (nullptr == operationWithoutGrids || IsMoreAccurate(candidateOperation, *operationWithoutGrids))
+                    operationWithoutGrids = &candidateOperation;
+            }
+            else if (::CrsKit::GetMissingGridFiles(candidateOperation).empty())
+            {
+                if (nullptr == operationWithInstalledGrids || IsMoreAccurate(candidateOperation, *operationWithInstalledGrids))
+                    operationWithInstalledGrids = &candidateOperation;
+            }
+        }
+
+        if (!hasCandidateBoundingBoxContainingPosition)
+            return 0;
+        if (nullptr != operationWithInstalledGrids)
+            return operationWithInstalledGrids->Code;
+        if (nullptr != operationWithoutGrids)
+            return operationWithoutGrids->Code;
+        throw std::runtime_error(std::format(
+            "Every candidate datum shift to WGS 84 whose area-of-use bounding box contains latitude {} and longitude {} degrees needs a grid file that is not installed.",
+            latitudeDegrees, longitudeDegrees));
+    }
+
     // Returns true if wkt is one element KEYWORD[...] whose brackets and quotes are balanced and that has nothing after it. The keyword
     // may contain letters, underscores, or both, as in COMPD_CS, VERT_CS and LOCAL_CS.
     // crskit's parser can fail with an access violation on some truncated texts, such as "]" or a PROJCS cut inside AXIS.
@@ -364,33 +470,8 @@ namespace winrt::Digi21::CrsKit::Interop::implementation
             auto const source = GetCoordinateSystemFactory()->CreateFromWkt(winrt::to_string(sourceWkt));
             auto const target = GetCoordinateSystemFactory()->CreateFromWkt(winrt::to_string(targetWkt));
 
-            // CrsKit invokes selectOperation only when more than one operation applies. The callback stores the candidate
-            // operations; this method discards the transformation that CrsKit then builds.
-            std::vector<CoordinateOperation> candidateOperations;
-            bool hasReceivedCandidateOperations{ false };
-            CoordinateTransformationOptions options{};
-            options.selectOperation =
-                [&candidateOperations, &hasReceivedCandidateOperations](std::string const&, std::string const&,
-                                         std::vector<CoordinateOperation> const& availableCandidateOperations) -> int
-                {
-                    candidateOperations = availableCandidateOperations;
-                    hasReceivedCandidateOperations = true;
-                    return availableCandidateOperations.empty() ? 0 : availableCandidateOperations.front().Code; // CrsKit builds the discarded transformation with the first operation
-                };
-
-            try
-            {
-                (void)GetCoordinateTransformationFactory()->CreateFromCoordinateSystems(source, target, options);
-            }
-            catch (...)
-            {
-                // After CrsKit has passed the candidate operations, a failure to create the transformation with the first candidate operation does not propagate:
-                // another candidate may be usable. The failure propagates only if CrsKit did not invoke the callback.
-                if (!hasReceivedCandidateOperations) throw;
-            }
-
             auto result = winrt::single_threaded_vector<winrt::Digi21::CrsKit::Interop::CoordinateOperationInfo>();
-            for (auto const& candidateOperation : candidateOperations)
+            for (auto const& candidateOperation : CollectCandidateOperations(source, target))
                 result.Append(MakeOperationInfo(candidateOperation));
             return result.GetView();
         }
@@ -555,22 +636,75 @@ namespace winrt::Digi21::CrsKit::Interop::implementation
         catch (std::exception const& e) { ThrowWinrtError(e); }
     }
 
-    winrt::Digi21::CrsKit::Interop::Transformation CrsEngine::CreateEastNorthToWgs84LatitudeLongitude(hstring const& sourceWkt)
+    winrt::Digi21::CrsKit::Interop::Transformation CrsEngine::CreateEastNorthToWgs84LatitudeLongitude(hstring const& sourceWkt, double eastInSourceUnits, double northInSourceUnits)
     {
         EnsureInitialized();
         try
         {
-            auto const utilities = GetUtilities();
-            auto const horizontalWkt = utilities->ExtractHorizontalVertical(winrt::to_string(sourceWkt)).first;
-
             // The transformation expects {easting, northing} or {longitude, latitude}, whatever axis order the source CRS declares.
-            auto const source = GetCoordinateSystemFactory()->CreateFromWkt(utilities->GetWktWithEastNorthAxes(horizontalWkt));
             // EPSG:4326 declares the latitude first, so Transform returns {latitude, longitude} in degrees.
-            auto const target = GetCoordinateSystemAuthorityFactory()->CreateGeographicCoordinateSystem(4326);
+            auto const [source, target] = CreateEastNorthSourceAndWgs84Target(sourceWkt);
+            auto const [latitudeDegrees, longitudeDegrees] = GetLatitudeLongitudeDegrees(source, eastInSourceUnits, northInSourceUnits);
 
-            auto const coordinateTransformation = GetCoordinateTransformationFactory()->CreateFromCoordinateSystems(source, target);
+            bool noCandidateBoundingBoxContainsPosition{ false };
+            CoordinateTransformationOptions options{};
+            options.selectOperation = [&](std::string const&, std::string const&, std::vector<CoordinateOperation> const& candidateOperations) -> int
+            {
+                auto const operationCode = SelectOperationForPosition(candidateOperations, latitudeDegrees, longitudeDegrees);
+                noCandidateBoundingBoxContainsPosition = 0 == operationCode;
+                return operationCode;
+            };
+
+            std::shared_ptr<ICoordinateTransformation> coordinateTransformation;
+            try
+            {
+                coordinateTransformation = GetCoordinateTransformationFactory()->CreateFromCoordinateSystems(source, target, options);
+            }
+            catch (std::exception const&)
+            {
+                if (!noCandidateBoundingBoxContainsPosition)
+                    throw;
+            }
+            // When selectOperation returns 0, CrsKit throws or returns no transformation.
+            if (noCandidateBoundingBoxContainsPosition)
+                return nullptr;
             if (!coordinateTransformation)
-                throw winrt::hresult_error(E_FAIL, L"No coordinate operation converts this system to WGS 84.");
+                throw winrt::hresult_error(E_FAIL, L"No coordinate operation converts the horizontal component of sourceWkt to WGS 84.");
+            return winrt::make<implementation::Transformation>(coordinateTransformation);
+        }
+        catch (winrt::hresult_error const&) { throw; }
+        catch (std::exception const& e) { ThrowWinrtError(e); }
+    }
+
+    winrt::Windows::Foundation::Collections::IVectorView<winrt::Digi21::CrsKit::Interop::CoordinateOperationInfo>
+        CrsEngine::GetEastNorthToWgs84CandidateOperations(hstring const& sourceWkt)
+    {
+        EnsureInitialized();
+        try
+        {
+            auto const [source, target] = CreateEastNorthSourceAndWgs84Target(sourceWkt);
+            auto result = winrt::single_threaded_vector<winrt::Digi21::CrsKit::Interop::CoordinateOperationInfo>();
+            for (auto const& candidateOperation : CollectCandidateOperations(source, target))
+                result.Append(MakeOperationInfo(candidateOperation));
+            return result.GetView();
+        }
+        catch (winrt::hresult_error const&) { throw; }
+        catch (std::exception const& e) { ThrowWinrtError(e); }
+    }
+
+    winrt::Digi21::CrsKit::Interop::Transformation CrsEngine::CreateEastNorthToWgs84LatitudeLongitudeWithOperation(hstring const& sourceWkt, int32_t operationCode)
+    {
+        EnsureInitialized();
+        try
+        {
+            auto const [source, target] = CreateEastNorthSourceAndWgs84Target(sourceWkt);
+            CoordinateTransformationOptions options{};
+            options.selectOperation =
+                [operationCode](std::string const&, std::string const&, std::vector<CoordinateOperation> const&) -> int { return operationCode; };
+
+            auto const coordinateTransformation = GetCoordinateTransformationFactory()->CreateFromCoordinateSystems(source, target, options);
+            if (!coordinateTransformation)
+                throw winrt::hresult_error(E_FAIL, L"No coordinate operation converts the horizontal component of sourceWkt to WGS 84.");
             return winrt::make<implementation::Transformation>(coordinateTransformation);
         }
         catch (winrt::hresult_error const&) { throw; }
