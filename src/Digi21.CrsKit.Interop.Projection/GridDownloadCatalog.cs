@@ -87,7 +87,8 @@ public sealed class GridDownloadCatalog(string cacheFilePath)
 
     /// <summary>Downloads url to destinationFilePath through a ".part" file that replaces destinationFilePath only when the
     /// download completes, and reports the downloaded fraction, from 0 to 1, when the response Content-Length is greater than
-    /// zero. Throws on failure.</summary>
+    /// zero. Attempts to delete the ".part" file if copying the response or moving the file throws, and rethrows the caught
+    /// exception if the deletion succeeds or throws IOException or UnauthorizedAccessException.</summary>
     public static async Task DownloadFileAsync(string url, string destinationFilePath, IProgress<double>? progress = null,
         CancellationToken cancellation = default)
     {
@@ -100,22 +101,32 @@ public sealed class GridDownloadCatalog(string cacheFilePath)
         response.EnsureSuccessStatusCode();
         var totalBytes = response.Content.Headers.ContentLength;
 
-        await using (var source = await response.Content.ReadAsStreamAsync(cancellation))
-        await using (var destination = File.Create(partialFilePath))
+        try
         {
-            var buffer = new byte[81920];
-            long readBytes = 0;
-            int count;
-            while ((count = await source.ReadAsync(buffer, cancellation)) > 0)
+            await using (var source = await response.Content.ReadAsStreamAsync(cancellation))
+            await using (var destination = File.Create(partialFilePath))
             {
-                await destination.WriteAsync(buffer.AsMemory(0, count), cancellation);
-                readBytes += count;
-                if (totalBytes is > 0)
-                    progress?.Report((double)readBytes / totalBytes.Value);
+                var buffer = new byte[81920];
+                long readBytes = 0;
+                int count;
+                while ((count = await source.ReadAsync(buffer, cancellation)) > 0)
+                {
+                    await destination.WriteAsync(buffer.AsMemory(0, count), cancellation);
+                    readBytes += count;
+                    if (totalBytes is > 0)
+                        progress?.Report((double)readBytes / totalBytes.Value);
+                }
             }
-        }
 
-        File.Move(partialFilePath, destinationFilePath, overwrite: true);
+            File.Move(partialFilePath, destinationFilePath, overwrite: true);
+        }
+        catch
+        {
+            // Ignores IOException and UnauthorizedAccessException from File.Delete so the caught download exception is rethrown.
+            try { File.Delete(partialFilePath); }
+            catch (Exception deleteException) when (deleteException is IOException or UnauthorizedAccessException) { }
+            throw;
+        }
     }
 
     // Replaces the active list with the valid entries of json; returns false, without changing the list, if there are none.
