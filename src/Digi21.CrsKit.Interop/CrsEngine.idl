@@ -137,6 +137,12 @@ namespace Digi21.CrsKit.Interop
         // of each returned CoordinateOperationInfo lists the missing grid files. Returns an empty list when at most one datum shift
         // applies.
         static Windows.Foundation.Collections.IVectorView<CoordinateOperationInfo> GetEastNorthToWgs84CandidateOperations(String sourceWkt);
+        // Returns the operations of GetEastNorthToWgs84CandidateOperations whose area-of-use bounding box contains the latitude
+        // and longitude calculated from {eastInSourceUnits, northInSourceUnits}, in the order of
+        // GetEastNorthToWgs84CandidateOperations. Returns an empty list if GetEastNorthToWgs84CandidateOperations(sourceWkt)
+        // returns an empty list or if none of its operations has an area-of-use bounding box containing the calculated position.
+        static Windows.Foundation.Collections.IVectorView<CoordinateOperationInfo> GetEastNorthToWgs84CandidateOperationsAtPosition(
+            String sourceWkt, Double eastInSourceUnits, Double northInSourceUnits);
         // Creates a transformation with the same input and output as CreateEastNorthToWgs84LatitudeLongitude, using the datum
         // shift whose EPSG code is operationCode, for example a code from GetEastNorthToWgs84CandidateOperations.
         static Transformation CreateEastNorthToWgs84LatitudeLongitudeWithOperation(String sourceWkt, Int32 operationCode);

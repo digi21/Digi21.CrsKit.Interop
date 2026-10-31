@@ -725,6 +725,24 @@ namespace winrt::Digi21::CrsKit::Interop::implementation
         catch (std::exception const& e) { ThrowWinrtError(e); }
     }
 
+    winrt::Windows::Foundation::Collections::IVectorView<winrt::Digi21::CrsKit::Interop::CoordinateOperationInfo>
+        CrsEngine::GetEastNorthToWgs84CandidateOperationsAtPosition(hstring const& sourceWkt, double eastInSourceUnits, double northInSourceUnits)
+    {
+        EnsureInitialized();
+        try
+        {
+            auto const [source, target] = CreateEastNorthSourceAndWgs84Target(sourceWkt);
+            auto const [latitudeDegrees, longitudeDegrees] = GetLatitudeLongitudeDegrees(source, eastInSourceUnits, northInSourceUnits);
+            auto result = winrt::single_threaded_vector<winrt::Digi21::CrsKit::Interop::CoordinateOperationInfo>();
+            for (auto const& candidateOperation : SelectCandidateOperationsWithMissingGridsOrCreatableTransformation(source, target, CollectCandidateOperations(source, target)))
+                if (candidateOperation.AreaOfUseBoundingBox && candidateOperation.AreaOfUseBoundingBox->Contains(latitudeDegrees, longitudeDegrees))
+                    result.Append(MakeOperationInfo(candidateOperation));
+            return result.GetView();
+        }
+        catch (winrt::hresult_error const&) { throw; }
+        catch (std::exception const& e) { ThrowWinrtError(e); }
+    }
+
     winrt::Digi21::CrsKit::Interop::Transformation CrsEngine::CreateEastNorthToWgs84LatitudeLongitudeWithOperation(hstring const& sourceWkt, int32_t operationCode)
     {
         EnsureInitialized();
